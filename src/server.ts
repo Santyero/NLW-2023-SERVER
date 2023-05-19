@@ -1,10 +1,10 @@
-import fastify, { FastifyRequest, FastifyReply } from 'fastify'
-import { PrismaClient } from '@prisma/client'
-import { User } from './interfaces/User'
+import fastify from 'fastify'
+import { memoriesRoutes } from './routes/memories'
 
 const app = fastify()
 const PORT = 3333
-const prisma = new PrismaClient()
+
+app.register(memoriesRoutes, { prefix: '/memories' })
 
 app
   .listen({
@@ -13,27 +13,3 @@ app
   .then(() => {
     console.log('Server is running on port http://localhost:' + PORT + '/')
   })
-
-app.get('/', (_req, res) => {
-  res.send({
-    message: 'Server of NLW 2023 🚀',
-  })
-})
-
-app.get('/users', async (req, res) => {
-  const users = await prisma.user.findMany()
-  res.send(users)
-})
-
-app.post('/users', async (req: FastifyRequest, res: FastifyReply) => {
-  const { name, email, password } = req.body as User
-
-  const user = await prisma.user.create({
-    data: {
-      name,
-      email,
-      password,
-    },
-  })
-  res.send(user)
-})
