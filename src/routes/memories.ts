@@ -3,6 +3,10 @@ import { prisma } from '../lib/prisma'
 import z from 'zod'
 
 export async function memoriesRoutes(app: FastifyInstance) {
+  app.addHook('preHandler', async (req) => {
+    await req.jwtVerify()
+  })
+
   app.get('/', async (req, res) => {
     const memories = await prisma.memory.findMany({
       orderBy: {
@@ -23,11 +27,17 @@ export async function memoriesRoutes(app: FastifyInstance) {
       id: z.string().uuid(),
     })
     const { id } = paramShemas.parse(req.params)
-    return await prisma.memory.findUniqueOrThrow({
+    const memory = await prisma.memory.findUniqueOrThrow({
       where: {
         id,
       },
     })
+
+    if (!memory.isPublic && memory.userId !== req.user.sub) {
+      return res.status(401).send()
+    }
+
+    return memory
   })
 
   app.post('/', async (req, res) => {
@@ -41,7 +51,7 @@ export async function memoriesRoutes(app: FastifyInstance) {
       data: {
         content,
         isPublic,
-        userId: 'f7cc2478-dea7-4ad9-b119-2db82eb82582',
+        userId: req.user.sub,
       },
     })
   })
@@ -58,6 +68,16 @@ export async function memoriesRoutes(app: FastifyInstance) {
       isPublic: z.coerce.boolean().default(false),
     })
     const { content, coverUrl, isPublic } = bodySchema.parse(req.body)
+    const memory = await prisma.memory.findUniqueOrThrow({
+      where: {
+        id,
+      },
+    })
+
+    if (memory.userId !== req.user.sub) {
+      return res.status(401).send()
+    }
+
     return await prisma.memory.update({
       where: {
         id,
@@ -70,11 +90,22 @@ export async function memoriesRoutes(app: FastifyInstance) {
     })
   })
 
-  app.delete('/:id', async (req) => {
+  app.delete('/:id', async (req, res) => {
     const paramShemas = z.object({
       id: z.string().uuid(),
     })
     const { id } = paramShemas.parse(req.params)
+
+    const memory = await prisma.memory.findUniqueOrThrow({
+      where: {
+        id,
+      },
+    })
+
+    if (memory.userId !== req.user.sub) {
+      return res.status(401).send()
+    }
+
     await prisma.memory.delete({
       where: {
         id,
